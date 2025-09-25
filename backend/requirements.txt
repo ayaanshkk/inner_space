@@ -1,0 +1,9 @@
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+google-cloud-vision==3.4.5
+google-auth==2.23.4
+requests==2.31.0
+ezdxf==1.0.3
+python-dotenv==1.0.0
+pillow==10.1.0  
