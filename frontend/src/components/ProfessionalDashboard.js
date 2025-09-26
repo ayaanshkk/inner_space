@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { AreaChart, Area, BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { 
   FileText, 
@@ -732,7 +732,8 @@ function UploadContent() {
       {/* Results - Use the full AnalysisResults component */}
       {analysisResults && (
         <div className="space-y-6">
-          <AnalysisResultsComponent results={analysisResults} />
+          <AnalysisResultsDisplay results={analysisResults} />
+          {/* <AnalysisResultsComponent results={analysisResults} /> */}
           <div className="text-center">
             <Button variant="outline" onClick={resetAnalysis}>
               Analyze Another Drawing
@@ -744,9 +745,9 @@ function UploadContent() {
   )
 }
 
-// Full AnalysisResults Component integrated into dashboard
-function AnalysisResultsComponent({ results }) {
+function AnalysisResultsDisplay({ results }) {
   const [activeTab, setActiveTab] = useState('summary')
+  const [editingCell, setEditingCell] = useState(null)
 
   const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4']
 
@@ -763,6 +764,47 @@ function AnalysisResultsComponent({ results }) {
   }
 
   const { summary, results: analysisData, filename, timestamp, dxf_content, configuration } = results
+  const [editedData, setEditedData] = useState(analysisData)
+
+  useEffect(() => {
+    setEditedData(analysisData)
+  }, [analysisData])
+
+  // Add the helper functions here, inside the component:
+  const handleCellEdit = (category, itemIndex, field, value) => {
+    setEditedData(prev => ({
+      ...prev,
+      [category]: {
+        ...prev[category],
+        items: prev[category].items.map((item, index) => 
+          index === itemIndex 
+            ? { 
+                ...item, 
+                [field]: field === 'width' || field === 'height' ? parseInt(value) || 0 : value,
+                dimensions: field === 'width' || field === 'height' 
+                  ? `${field === 'width' ? (parseInt(value) || 0) : item.width} x ${field === 'height' ? (parseInt(value) || 0) : item.height}`
+                  : item.dimensions
+              }
+            : item
+        )
+      }
+    }))
+  }
+
+  const handleCellClick = (category, itemIndex, field) => {
+    setEditingCell(`${category}-${itemIndex}-${field}`)
+  }
+
+  const handleCellBlur = () => {
+    setEditingCell(null)
+  }
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      setEditingCell(null)
+    }
+  }
+
 
   // Prepare chart data
   const categoryData = Object.entries(analysisData).map(([category, data]) => ({
@@ -797,22 +839,148 @@ function AnalysisResultsComponent({ results }) {
     window.URL.revokeObjectURL(url)
   }
 
-  const downloadDXF = () => {
-    if (dxf_content) {
-      const binaryString = atob(dxf_content)
-      const bytes = new Uint8Array(binaryString.length)
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i)
+const generateLayoutDXF = () => {
+  if (!editedData) return;
+  
+  // Basic DXF header
+  let dxfContent = `0
+  SECTION
+  2
+  HEADER
+  9
+  $ACADVER
+  1
+  AC1015
+  0
+  ENDSEC
+  0
+  SECTION
+  2
+  ENTITIES
+  `;
+
+  let currentX = 0;
+  let currentY = 0;
+  const spacing = 50; // 50mm spacing between pieces
+  let maxRowHeight = 0;
+  const maxWidth = 2440; // Max sheet width in mm
+
+  // Process each category
+  Object.entries(editedData).forEach(([category, data]) => {
+    data.items.forEach((item) => {
+      const width = item.width;
+      const height = item.height;
+      
+      // Check if we need to move to next row
+      if (currentX + width > maxWidth) {
+        currentY += maxRowHeight + spacing;
+        currentX = 0;
+        maxRowHeight = 0;
       }
-      const blob = new Blob([bytes], { type: 'application/dxf' })
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `layout_${filename.split('.')[0]}_${new Date().toISOString().split('T')[0]}.dxf`
-      a.click()
-      window.URL.revokeObjectURL(url)
-    }
-  }
+      
+      // Draw rectangle for each piece
+      dxfContent += `0
+      POLYLINE
+      8
+      ${category.replace(/[^A-Za-z0-9]/g, '_')}
+      66
+      1
+      10
+      0.0
+      20
+      0.0
+      30
+      0.0
+      0
+      VERTEX
+      8
+      ${category.replace(/[^A-Za-z0-9]/g, '_')}
+      10
+      ${currentX}
+      20
+      ${currentY}
+      30
+      0.0
+      0
+      VERTEX
+      8
+      ${category.replace(/[^A-Za-z0-9]/g, '_')}
+      10
+      ${currentX + width}
+      20
+      ${currentY}
+      30
+      0.0
+      0
+      VERTEX
+      8
+      ${category.replace(/[^A-Za-z0-9]/g, '_')}
+      10
+      ${currentX + width}
+      20
+      ${currentY + height}
+      30
+      0.0
+      0
+      VERTEX
+      8
+      ${category.replace(/[^A-Za-z0-9]/g, '_')}
+      10
+      ${currentX}
+      20
+      ${currentY + height}
+      30
+      0.0
+      0
+      VERTEX
+      8
+      ${category.replace(/[^A-Za-z0-9]/g, '_')}
+      10
+      ${currentX}
+      20
+      ${currentY}
+      30
+      0.0
+      0
+      SEQEND
+      8
+      ${category.replace(/[^A-Za-z0-9]/g, '_')}
+      0
+      TEXT
+      8
+      ${category.replace(/[^A-Za-z0-9]/g, '_')}_TEXT
+      10
+      ${currentX + width/2}
+      20
+      ${currentY + height/2}
+      30
+      0.0
+      40
+      8.0
+      1
+      ${item.part_id}
+      `;
+
+      currentX += width + spacing;
+      maxRowHeight = Math.max(maxRowHeight, height);
+    });
+  });
+
+  // DXF footer
+  dxfContent += `0
+  ENDSEC
+  0
+  EOF`;
+
+  // Download the DXF file
+  const blob = new Blob([dxfContent], { type: 'application/dxf' });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `cutting_layout_${filename.split('.')[0]}_${new Date().toISOString().split('T')[0]}.dxf`;
+  a.click();
+  window.URL.revokeObjectURL(url);
+};
 
   const tabs = [
     { id: 'summary', label: 'Summary', icon: BarChart3 },
@@ -867,6 +1035,11 @@ function AnalysisResultsComponent({ results }) {
             <Button variant="outline" onClick={downloadCSV}>
               <Download className="h-4 w-4 mr-2" />
               Download CSV
+            </Button>
+            
+            <Button variant="outline" onClick={generateLayoutDXF}>
+              <Download className="h-4 w-4 mr-2" />
+              Generate Layout DXF
             </Button>
             
             {dxf_content && (
@@ -993,11 +1166,51 @@ function AnalysisResultsComponent({ results }) {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
-                        {data.items.map((item, index) => (
+                        {editedData[category].items.map((item, index) => (
                           <tr key={index} className="hover:bg-gray-50">
                             <td className="px-4 py-3 text-sm font-medium text-gray-900">{item.part_id}</td>
-                            <td className="px-4 py-3 text-sm text-gray-900 font-mono">{item.dimensions}</td>
-                            <td className="px-4 py-3 text-sm text-gray-900">{item.quantity}</td>
+                            <td className="px-4 py-3 text-sm text-gray-900 font-mono">
+                              {editingCell === `${category}-${index}-dimensions` ? (
+                                <input
+                                  type="text"
+                                  value={item.dimensions}
+                                  onChange={(e) => handleCellEdit(category, index, 'dimensions', e.target.value)}
+                                  onBlur={handleCellBlur}
+                                  onKeyPress={handleKeyPress}
+                                  className="w-full px-2 py-1 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                  autoFocus
+                                />
+                              ) : (
+                                <span 
+                                  onClick={() => handleCellClick(category, index, 'dimensions')}
+                                  className="cursor-pointer hover:bg-blue-50 px-2 py-1 rounded"
+                                  title="Click to edit"
+                                >
+                                  {item.dimensions}
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-900">
+                              {editingCell === `${category}-${index}-quantity` ? (
+                                <input
+                                  type="number"
+                                  value={item.quantity}
+                                  onChange={(e) => handleCellEdit(category, index, 'quantity', e.target.value)}
+                                  onBlur={handleCellBlur}
+                                  onKeyPress={handleKeyPress}
+                                  className="w-full px-2 py-1 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                  autoFocus
+                                />
+                              ) : (
+                                <span 
+                                  onClick={() => handleCellClick(category, index, 'quantity')}
+                                  className="cursor-pointer hover:bg-blue-50 px-2 py-1 rounded"
+                                  title="Click to edit"
+                                >
+                                  {item.quantity}
+                                </span>
+                              )}
+                            </td>
                             <td className="px-4 py-3 text-sm text-gray-600">{item.material_type}</td>
                             <td className="px-4 py-3 text-sm text-gray-600 max-w-xs truncate" title={item.notes}>
                               {item.notes}
@@ -1775,15 +1988,15 @@ export default function ProfessionalDashboard({ onNewAnalysis }) {
     }
   }
 
-  // Handle the "New Analysis" button click from header
-  const handleNewAnalysis = () => {
-    if (onNewAnalysis && typeof onNewAnalysis === 'function') {
-      onNewAnalysis()
-    } else {
-      // Fallback: switch to upload page
-      setActiveMenuItem('upload')
-    }
-  }
+  // // Handle the "New Analysis" button click from header
+  // const handleNewAnalysis = () => {
+  //   if (onNewAnalysis && typeof onNewAnalysis === 'function') {
+  //     onNewAnalysis()
+  //   } else {
+  //     // Fallback: switch to upload page
+  //     setActiveMenuItem('upload')
+  //   }
+  // }
 
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -1815,10 +2028,6 @@ export default function ProfessionalDashboard({ onNewAnalysis }) {
                 <Button variant="outline" size="sm">
                   <RefreshCw className="h-4 w-4 mr-2" />
                   Refresh
-                </Button>
-                <Button onClick={handleNewAnalysis} className="bg-blue-600 hover:bg-blue-700">
-                  <Plus className="h-4 w-4 mr-2" />
-                  New Analysis
                 </Button>
               </div>
             </div>
