@@ -9,6 +9,14 @@ CORS(app)
 # Temporary in-memory storage - replace with database later
 customers = []
 jobs = []
+assignments = []
+staff_members = [
+    {"id": 1, "name": "John Smith", "role": "Installer", "user_id": "staff-001"},
+    {"id": 2, "name": "Mike Johnson", "role": "Installer", "user_id": None},
+    {"id": 3, "name": "Sarah Wilson", "role": "Measuring", "user_id": None},
+    {"id": 4, "name": "Tom Brown", "role": "Installer", "user_id": None},
+    {"id": 5, "name": "Lisa Davis", "role": "Delivery", "user_id": None},
+]
 
 @app.route('/customers', methods=['GET', 'POST'])
 def handle_customers():
@@ -31,7 +39,7 @@ def handle_customers():
 
 @app.route('/customers/<customer_id>', methods=['GET', 'PUT', 'DELETE'])
 def handle_customer(customer_id):
-    global customers  # Moved to the top of the function
+    global customers
     customer = next((c for c in customers if c['id'] == customer_id), None)
     
     if request.method == 'GET':
@@ -48,6 +56,12 @@ def handle_customer(customer_id):
     elif request.method == 'DELETE':
         customers = [c for c in customers if c['id'] != customer_id]
         return '', 204
+
+@app.route('/customers/active', methods=['GET'])
+def get_active_customers():
+    """Return active customers"""
+    active = [c for c in customers if c.get('status') == 'active']
+    return jsonify(active)
 
 @app.route('/jobs', methods=['GET', 'POST'])
 def handle_jobs():
@@ -68,7 +82,7 @@ def handle_jobs():
 
 @app.route('/jobs/<job_id>', methods=['GET', 'PUT', 'DELETE'])
 def handle_job(job_id):
-    global jobs  # Moved to the top of the function
+    global jobs
     job = next((j for j in jobs if j['id'] == job_id), None)
     
     if request.method == 'GET':
@@ -84,6 +98,66 @@ def handle_job(job_id):
     
     elif request.method == 'DELETE':
         jobs = [j for j in jobs if j['id'] != job_id]
+        return '', 204
+
+@app.route('/jobs/available', methods=['GET'])
+def get_available_jobs():
+    """Return jobs that are available for scheduling"""
+    # Return jobs that are in certain stages ready for scheduling
+    available = [j for j in jobs if j.get('stage') in ['Quoted', 'Accepted', 'Production', 'ready']]
+    return jsonify(available)
+
+@app.route('/assignments', methods=['GET', 'POST'])
+def handle_assignments():
+    if request.method == 'GET':
+        return jsonify(assignments)
+    
+    data = request.json
+    assignment = {
+        'id': str(uuid.uuid4()),
+        'created_at': datetime.now().isoformat(),
+        'updated_at': datetime.now().isoformat(),
+        'type': data.get('type', 'job'),
+        'staff_id': data.get('staff_id'),
+        'date': data.get('date'),
+        'start_time': data.get('start_time'),
+        'end_time': data.get('end_time'),
+        'estimated_hours': data.get('estimated_hours', 0),
+        'priority': data.get('priority', 'Medium'),
+        'status': data.get('status', 'Scheduled'),
+        'title': data.get('title', ''),
+        'notes': data.get('notes', ''),
+        'job_id': data.get('job_id'),
+        'customer_id': data.get('customer_id'),
+        **data
+    }
+    assignments.append(assignment)
+    return jsonify({'assignment': assignment}), 201
+
+# Add this route with your other routes
+@app.route('/staff', methods=['GET'])
+def get_staff():
+    """Return all staff members"""
+    return jsonify(staff_members)
+
+@app.route('/assignments/<assignment_id>', methods=['GET', 'PUT', 'DELETE'])
+def handle_assignment(assignment_id):
+    global assignments
+    assignment = next((a for a in assignments if a['id'] == assignment_id), None)
+    
+    if request.method == 'GET':
+        return jsonify(assignment) if assignment else ('', 404)
+    
+    elif request.method == 'PUT':
+        if assignment:
+            data = request.json
+            assignment.update(data)
+            assignment['updated_at'] = datetime.now().isoformat()
+            return jsonify({'assignment': assignment})
+        return ('', 404)
+    
+    elif request.method == 'DELETE':
+        assignments = [a for a in assignments if a['id'] != assignment_id]
         return '', 204
 
 @app.route('/pipeline', methods=['GET'])
@@ -119,7 +193,8 @@ def health_check():
         'status': 'healthy',
         'timestamp': datetime.now().isoformat(),
         'customers_count': len(customers),
-        'jobs_count': len(jobs)
+        'jobs_count': len(jobs),
+        'assignments_count': len(assignments)
     })
 
 if __name__ == '__main__':

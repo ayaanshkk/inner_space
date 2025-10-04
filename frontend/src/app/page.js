@@ -5,10 +5,12 @@ import UploadArea from '../components/UploadArea'
 import AnalysisResults from '../components/AnalysisResults'
 import LoadingSpinner from '../components/LoadingSpinner'
 import ProfessionalDashboard from '../components/ProfessionalDashboard'
+import AuthenticationWrapper from '../components/LoginRegister'
 import { Upload, Settings, FileText, Zap, CheckCircle, BarChart3, Home, FileImage, AlertCircle } from 'lucide-react'
 import { Card } from "../components/ui/card"
 
-export default function HomePage() {
+// Component that wraps the dashboard and analyzer together
+function DashboardWithAnalyzer({ user, onLogout }) {
   const [currentView, setCurrentView] = useState('dashboard')
   const [uploadedFile, setUploadedFile] = useState(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
@@ -39,7 +41,6 @@ export default function HomePage() {
       const formData = new FormData()
       formData.append('file', uploadedFile)
       
-      // Append each config value as a separate form field
       formData.append('back_width_offset', config.back_width_offset.toString())
       formData.append('top_depth_offset', config.top_depth_offset.toString())
       formData.append('shelf_depth_offset', config.shelf_depth_offset.toString())
@@ -50,7 +51,6 @@ export default function HomePage() {
       const response = await fetch('http://localhost:8000/analyze', {
         method: 'POST',
         body: formData,
-        // Don't set Content-Type - browser sets it with boundary
       })
 
       const result = await response.json()
@@ -79,10 +79,18 @@ export default function HomePage() {
     resetAnalysis()
   }
 
+  // Show Dashboard
   if (currentView === 'dashboard') {
-    return <ProfessionalDashboard onNewAnalysis={switchToAnalyzer} />
+    return (
+      <ProfessionalDashboard 
+        user={user} 
+        onLogout={onLogout}
+        onNewAnalysis={switchToAnalyzer} 
+      />
+    )
   }
 
+  // Show Analyzer
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
       <header className="gradient-bg text-white">
@@ -341,4 +349,9 @@ export default function HomePage() {
       </main>
     </div>
   )
+}
+
+// Main HomePage component - wraps everything with authentication
+export default function HomePage() {
+  return <AuthenticationWrapper DashboardComponent={DashboardWithAnalyzer} />
 }

@@ -14,7 +14,8 @@ const Icons = {
   Loader2: () => <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg>,
   RefreshCw: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
   Trash2: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>,
-  X: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+  X: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>,
+  Eye: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
 };
 
 const MOCK_TEAM_MEMBERS = [
@@ -96,7 +97,7 @@ function Modal({ isOpen, onClose, title, description, children }) {
   );
 }
 
-export default function JobScheduling() {
+export default function JobScheduling({ userRole, user }) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [assignments, setAssignments] = useState([]);
   const [teamMembers, setTeamMembers] = useState(MOCK_TEAM_MEMBERS);
@@ -117,6 +118,26 @@ export default function JobScheduling() {
     status: "Scheduled",
     estimated_hours: 8,
   });
+
+  const isStaff = userRole === 'staff';
+  const currentUserId = user?.id || null;
+
+  const visibleTeamMembers = useMemo(() => {
+    console.log('Filtering team members - isStaff:', isStaff, 'currentUserId:', currentUserId);
+    console.log('All team members:', teamMembers);
+    
+    if (isStaff && currentUserId) {
+      // Map staff user ID to team member ID
+      const staffMemberId = currentUserId === 'staff-001' ? 1 : parseInt(currentUserId);
+      console.log('Staff member ID to filter:', staffMemberId);
+      
+      const filtered = teamMembers.filter(member => member.id === staffMemberId);
+      console.log('Filtered team members:', filtered);
+      
+      return filtered;
+    }
+    return teamMembers;
+  }, [teamMembers, isStaff, currentUserId]);
 
   const calendarDays = useMemo(() => {
     const year = currentDate.getFullYear();
@@ -164,26 +185,28 @@ export default function JobScheduling() {
       setError(null);
 
       try {
-        const [assignmentsRes, jobsRes, customersRes] = await Promise.all([
+        const [assignmentsRes, jobsRes, customersRes, staffRes] = await Promise.all([
           fetch('http://127.0.0.1:5000/assignments'),
           fetch('http://127.0.0.1:5000/jobs/available'),
           fetch('http://127.0.0.1:5000/customers/active'),
+          fetch('http://127.0.0.1:5000/staff'),
         ]);
         
-        if (!assignmentsRes.ok || !jobsRes.ok || !customersRes.ok) {
+        if (!assignmentsRes.ok || !jobsRes.ok || !customersRes.ok || !staffRes.ok) {
           throw new Error('API not available');
         }
         
-        const [assignmentsData, jobsData, customersData] = await Promise.all([
+        const [assignmentsData, jobsData, customersData, staffData] = await Promise.all([
           assignmentsRes.json(),
           jobsRes.json(),
           customersRes.json(),
+          staffRes.json(),
         ]);
         
         setAssignments(assignmentsData);
         setAvailableJobs(jobsData);
         setCustomers(customersData);
-        setTeamMembers(MOCK_TEAM_MEMBERS);
+        setTeamMembers(staffData);
       } catch (apiError) {
         console.log('API not available, using demo data');
         setTeamMembers(MOCK_TEAM_MEMBERS);
@@ -518,12 +541,24 @@ export default function JobScheduling() {
             <Icons.RefreshCw />
             <span className="ml-2">Refresh</span>
           </Button>
-          <Button onClick={() => setShowAddDialog(true)}>
+          <Button onClick={() => setShowAddDialog(true)} disabled={isStaff}>
             <Icons.Plus />
             <span className="ml-2">Add Assignment</span>
           </Button>
         </div>
       </div>
+
+      {/* View-Only Banner for Staff */}
+      {isStaff && (
+        <div className="px-6 py-3 bg-blue-50 border-b border-blue-200">
+          <div className="flex items-center space-x-2">
+            <Icons.Eye />
+            <span className="text-sm font-medium text-blue-800">
+              View Only Mode - You can only view your own schedule
+            </span>
+          </div>
+        </div>
+      )}
 
       <div className="p-6">
         <div className="border rounded-lg overflow-auto shadow-sm">
@@ -542,7 +577,7 @@ export default function JobScheduling() {
           </div>
 
           <div className="divide-y divide-gray-200">
-            {teamMembers.map((member) => (
+            {visibleTeamMembers.map((member) => (
               <div key={member.id} className="grid" style={{ gridTemplateColumns }}>
                 <div className="p-3 border-r border-gray-200 bg-white sticky left-0 z-10">
                   <div className="flex items-center space-x-3">
@@ -564,8 +599,8 @@ export default function JobScheduling() {
                     <div
                       key={dayIndex}
                       className="p-2 border-r border-gray-200 min-h-[96px] relative bg-white"
-                      onDragOver={handleDragOver}
-                      onDrop={(e) => handleDrop(e, day, member.id.toString())}
+                      onDragOver={!isStaff ? handleDragOver : undefined}
+                      onDrop={!isStaff ? (e) => handleDrop(e, day, member.id.toString()) : undefined}
                     >
                       {overbooked && (
                         <div className="absolute top-1 right-1">
@@ -579,12 +614,14 @@ export default function JobScheduling() {
                         {dayAssignments.map((assignment) => (
                           <div
                             key={assignment.id}
-                            className={`relative rounded-md text-xs border p-2 cursor-pointer ${getAssignmentColor(assignment)}`}
-                            draggable
-                            onDragStart={() => handleDragStart(assignment)}
+                            className={`relative rounded-md text-xs border p-2 ${isStaff ? 'cursor-default' : 'cursor-pointer'} ${getAssignmentColor(assignment)}`}
+                            draggable={!isStaff}
+                            onDragStart={() => !isStaff && handleDragStart(assignment)}
                             onClick={() => {
-                              setSelectedAssignment(assignment);
-                              setShowEditDialog(true);
+                              if (!isStaff) {
+                                setSelectedAssignment(assignment);
+                                setShowEditDialog(true);
+                              }
                             }}
                             style={{ height: computeBlockHeight(assignment.estimated_hours) }}
                             title={assignment.title}
@@ -603,26 +640,28 @@ export default function JobScheduling() {
                           </div>
                         ))}
 
-                        <div className="pt-1">
-                          <button
-                            className="text-xs text-gray-400 hover:text-gray-700"
-                            onClick={() => {
-                              setNewAssignment({ 
-                                type: "job", 
-                                staff_id: member.id.toString(), 
-                                date: dayKey, 
-                                estimated_hours: 8, 
-                                start_time: "09:00", 
-                                end_time: "17:00",
-                                priority: "Medium",
-                                status: "Scheduled"
-                              });
-                              setShowAddDialog(true);
-                            }}
-                          >
-                            + Add
-                          </button>
-                        </div>
+                        {!isStaff && (
+                          <div className="pt-1">
+                            <button
+                              className="text-xs text-gray-400 hover:text-gray-700"
+                              onClick={() => {
+                                setNewAssignment({ 
+                                  type: "job", 
+                                  staff_id: member.id.toString(), 
+                                  date: dayKey, 
+                                  estimated_hours: 8, 
+                                  start_time: "09:00", 
+                                  end_time: "17:00",
+                                  priority: "Medium",
+                                  status: "Scheduled"
+                                });
+                                setShowAddDialog(true);
+                              }}
+                            >
+                              + Add
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );

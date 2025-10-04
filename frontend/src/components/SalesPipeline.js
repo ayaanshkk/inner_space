@@ -238,7 +238,7 @@ function KanbanColumn({ stage, items, onDrop, onOpenCustomer, onDragStart }) {
 }
 
 // Main Component
-export default function SalesPipeline() {
+export default function SalesPipeline({ userRole }) {
   const [pipelineItems, setPipelineItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -248,6 +248,33 @@ export default function SalesPipeline() {
   const [filterStage, setFilterStage] = useState("all");
   const [filterType, setFilterType] = useState("all");
   const [showFilters, setShowFilters] = useState(false);
+
+  const isStaff = userRole === 'staff';
+
+  // Staff should not have access to sales pipeline at all
+  if (isStaff) {
+    return (
+      <div className="p-6">
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-8">
+          <div className="flex items-start space-x-4">
+            <div className="flex-shrink-0">
+              <Icons.AlertCircle />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-yellow-900 mb-2">Access Restricted</h3>
+              <p className="text-sm text-yellow-800 mb-3">
+                You don't have permission to view the Sales Pipeline. This section is only available to administrators.
+              </p>
+              <p className="text-xs text-yellow-700">
+                If you believe you should have access, please contact your system administrator.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
 
   useEffect(() => {
     const fetchData = async () => {

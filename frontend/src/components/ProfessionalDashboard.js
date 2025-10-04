@@ -13,6 +13,7 @@ import {
   RefreshCw,
   CheckCircle2,
   AlertTriangle,
+  User,
   Users,
   Building2,
   ArrowUpRight,
@@ -36,8 +37,17 @@ import {
   Zap,
   Database,
   Cpu,
-  HardDrive
+  HardDrive,
+  Calculator,
+  Briefcase,
+  Calendar
 } from 'lucide-react'
+import CustomersPage from './Customers'
+import PriceGenerator from './PriceGenerator'
+import SalesPipeline from './SalesPipeline'
+import Jobs from './Jobs'
+import JobScheduling from './JobScheduling'
+ 
 
 // Mock data
 const mockAnalysisHistory = [
@@ -89,12 +99,15 @@ const recentMetrics = {
 }
 
 const sidebarMenuItems = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'upload', label: 'New Analysis', icon: Upload },
-  { id: 'history', label: 'Analysis History', icon: History },
-  { id: 'analytics', label: 'Analytics', icon: BarChart3 },
-  { id: 'projects', label: 'Projects', icon: FolderOpen },
-  { id: 'settings', label: 'Settings', icon: Settings },
+  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'staff'] },
+  { id: 'customers', label: 'Customers', icon: Users, roles: ['admin'] },
+  { id: 'salesPipeline', label: 'Sales Pipeline', icon: DollarSign, roles: ['admin'] },
+  { id: 'jobs', label: 'Jobs', icon: Briefcase, roles: ['admin'] },
+  { id: 'schedule', label: 'Schedule', icon: Calendar, roles: ['admin', 'staff'] },
+  { id: 'upload', label: 'New Analysis', icon: Upload, roles: ['admin', 'staff'] },
+  { id: 'priceGenerator', label: 'Price Generator', icon: Calculator, roles: ['admin'] },
+  { id: 'history', label: 'Analysis History', icon: History, roles: ['admin', 'staff'] },
+  { id: 'settings', label: 'Settings', icon: Settings, roles: ['admin'] },
 ]
 
 const bottomMenuItems = [
@@ -149,10 +162,14 @@ function Input({ className = "", ...props }) {
 }
 
 // Sidebar Component
-function Sidebar({ activeMenuItem, setActiveMenuItem, sidebarCollapsed, setSidebarCollapsed }) {
+function Sidebar({ activeMenuItem, setActiveMenuItem, sidebarCollapsed, setSidebarCollapsed, userRole, onLogout }) {
   const handleMenuClick = (menuId) => {
     setActiveMenuItem(menuId)
   }
+
+  const filteredMenuItems = sidebarMenuItems.filter(item => 
+    item.roles.includes(userRole)
+  )
 
   return (
     <div className={`bg-white border-r border-gray-200 transition-all duration-300 ${sidebarCollapsed ? 'w-16' : 'w-64'} flex-shrink-0`}>
@@ -185,7 +202,7 @@ function Sidebar({ activeMenuItem, setActiveMenuItem, sidebarCollapsed, setSideb
         {/* Navigation */}
         <nav className="flex-1 p-4">
           <ul className="space-y-2">
-            {sidebarMenuItems.map((item) => {
+            {filteredMenuItems.map((item) => { 
               const Icon = item.icon
               const isActive = activeMenuItem === item.id
               return (
@@ -215,7 +232,13 @@ function Sidebar({ activeMenuItem, setActiveMenuItem, sidebarCollapsed, setSideb
               return (
                 <li key={item.id}>
                   <button
-                    onClick={() => handleMenuClick(item.id)}
+                    onClick={() => {
+                      if (item.id === 'logout') {
+                        onLogout();  // Call the onLogout prop
+                      } else {
+                        handleMenuClick(item.id);
+                      }
+                    }}
                     className="w-full flex items-center space-x-3 px-3 py-2.5 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-50 hover:text-gray-900 transition-colors"
                   >
                     <Icon className="h-5 w-5 text-gray-400" />
@@ -232,8 +255,9 @@ function Sidebar({ activeMenuItem, setActiveMenuItem, sidebarCollapsed, setSideb
 }
 
 // Dashboard Content
-function DashboardContent() {
+function DashboardContent({ userRole }) {
   const [searchQuery, setSearchQuery] = useState('')
+  const isStaff = userRole === 'staff'
 
   const filteredHistory = mockAnalysisHistory.filter(item => 
     item.fileName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -268,6 +292,16 @@ function DashboardContent() {
 
   return (
     <div className="p-6 space-y-8">
+      {/* View-Only Banner for Staff */}
+      {isStaff && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-center space-x-2">
+            <Eye className="h-5 w-5 text-blue-600" />
+            <span className="text-sm font-medium text-blue-800">View Only Mode - You have read-only access to this dashboard</span>
+          </div>
+        </div>
+      )}
+
       {/* Metrics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 hover:shadow-md transition-shadow">
@@ -446,10 +480,16 @@ function DashboardContent() {
                   </td>
                   <td className="py-4 px-4">
                     <div className="flex items-center justify-end space-x-2">
-                      <Button variant="ghost" size="sm">
+                      <Button variant="ghost" size="sm" title="View details">
                         <Eye className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="sm">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        disabled={isStaff}
+                        title={isStaff ? "Download restricted for staff" : "Download"}
+                        className={isStaff ? "opacity-50 cursor-not-allowed" : ""}
+                      >
                         <Download className="h-4 w-4" />
                       </Button>
                     </div>
@@ -1474,319 +1514,6 @@ function AnalysisHistoryContent() {
   )
 }
 
-// Analytics Page
-function AnalyticsContent() {
-  return (
-    <div className="p-6 space-y-6">
-      {/* Key Performance Indicators */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white rounded-lg border p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-medium text-gray-600">Processing Efficiency</h3>
-            <Zap className="h-4 w-4 text-yellow-500" />
-          </div>
-          <div className="text-3xl font-bold text-gray-900">94.2%</div>
-          <div className="flex items-center text-sm text-green-600 mt-2">
-            <TrendingUp className="h-3 w-3 mr-1" />
-            +2.1% from last week
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg border p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-medium text-gray-600">Average Accuracy</h3>
-            <Target className="h-4 w-4 text-blue-500" />
-          </div>
-          <div className="text-3xl font-bold text-gray-900">97.8%</div>
-          <div className="flex items-center text-sm text-green-600 mt-2">
-            <ArrowUpRight className="h-3 w-3 mr-1" />
-            +0.5% this month
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg border p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-medium text-gray-600">Cost per Analysis</h3>
-            <DollarSign className="h-4 w-4 text-green-500" />
-          </div>
-          <div className="text-3xl font-bold text-gray-900">$0.34</div>
-          <div className="flex items-center text-sm text-red-600 mt-2">
-            <TrendingDown className="h-3 w-3 mr-1" />
-            -12% cost reduction
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg border p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-medium text-gray-600">Peak Load Time</h3>
-            <Clock className="h-4 w-4 text-purple-500" />
-          </div>
-          <div className="text-3xl font-bold text-gray-900">12-2 PM</div>
-          <div className="text-sm text-gray-500 mt-2">31 avg analyses/hour</div>
-        </div>
-      </div>
-
-      {/* Charts Row 1 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-xl border p-6">
-          <div className="mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">Success vs Failure Trend</h3>
-            <p className="text-sm text-gray-500">Monthly analysis outcomes</p>
-          </div>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={monthlyData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-              <XAxis dataKey="month" stroke="#6B7280" />
-              <YAxis stroke="#6B7280" />
-              <Tooltip />
-              <Bar dataKey="success" fill="#10B981" name="Success" />
-              <Bar dataKey="failed" fill="#EF4444" name="Failed" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        <div className="bg-white rounded-xl border p-6">
-          <div className="mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">System Performance</h3>
-            <p className="text-sm text-gray-500">Real-time system metrics</p>
-          </div>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={performanceData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-              <XAxis dataKey="time" stroke="#6B7280" />
-              <YAxis stroke="#6B7280" />
-              <Tooltip />
-              <Line type="monotone" dataKey="cpu" stroke="#3B82F6" name="CPU %" strokeWidth={2} />
-              <Line type="monotone" dataKey="memory" stroke="#10B981" name="Memory %" strokeWidth={2} />
-              <Line type="monotone" dataKey="processing" stroke="#F59E0B" name="Active Jobs" strokeWidth={2} />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* System Resources */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white rounded-lg border p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-medium text-gray-600">CPU Usage</h3>
-            <Cpu className="h-4 w-4 text-blue-500" />
-          </div>
-          <div className="text-2xl font-bold text-gray-900 mb-2">67%</div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
-            <div className="bg-blue-500 h-2 rounded-full" style={{ width: '67%' }}></div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg border p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-medium text-gray-600">Memory Usage</h3>
-            <HardDrive className="h-4 w-4 text-green-500" />
-          </div>
-          <div className="text-2xl font-bold text-gray-900 mb-2">74%</div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
-            <div className="bg-green-500 h-2 rounded-full" style={{ width: '74%' }}></div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg border p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-medium text-gray-600">Storage</h3>
-            <Database className="h-4 w-4 text-purple-500" />
-          </div>
-          <div className="text-2xl font-bold text-gray-900 mb-2">23%</div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
-            <div className="bg-purple-500 h-2 rounded-full" style={{ width: '23%' }}></div>
-          </div>
-        </div>
-      </div>
-
-      {/* Detailed Analytics Table */}
-      <div className="bg-white rounded-xl border p-6">
-        <div className="mb-6">
-          <h3 className="text-lg font-semibold text-gray-900">Detailed Performance Metrics</h3>
-          <p className="text-sm text-gray-500">Comprehensive system analytics</p>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="text-left py-3 px-4 font-medium text-gray-700">Metric</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-700">Current</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-700">Target</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-700">Trend</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-700">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr className="border-b">
-                <td className="py-4 px-4 font-medium">Average Response Time</td>
-                <td className="py-4 px-4">18.5s</td>
-                <td className="py-4 px-4">20s</td>
-                <td className="py-4 px-4 text-green-600">-8%</td>
-                <td className="py-4 px-4"><Badge className="bg-green-100 text-green-800">Excellent</Badge></td>
-              </tr>
-              <tr className="border-b">
-                <td className="py-4 px-4 font-medium">Error Rate</td>
-                <td className="py-4 px-4">5.8%</td>
-                <td className="py-4 px-4">&lt;10%</td>
-                <td className="py-4 px-4 text-green-600">-2%</td>
-                <td className="py-4 px-4"><Badge className="bg-green-100 text-green-800">Good</Badge></td>
-              </tr>
-              <tr className="border-b">
-                <td className="py-4 px-4 font-medium">Throughput</td>
-                <td className="py-4 px-4">45/hour</td>
-                <td className="py-4 px-4">40/hour</td>
-                <td className="py-4 px-4 text-green-600">+12%</td>
-                <td className="py-4 px-4"><Badge className="bg-green-100 text-green-800">Excellent</Badge></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// Projects Page
-function ProjectsContent() {
-  const [searchQuery, setSearchQuery] = useState('')
-  
-  const getStatusBadge = (status) => {
-    const statusConfig = {
-      'active': { color: 'bg-green-100 text-green-800', icon: CheckCircle2 },
-      'completed': { color: 'bg-blue-100 text-blue-800', icon: CheckCircle2 },
-      'on-hold': { color: 'bg-yellow-100 text-yellow-800', icon: Clock }
-    }
-    
-    const config = statusConfig[status] || statusConfig['active']
-    const Icon = config.icon
-    
-    return (
-      <Badge className={`${config.color} border-0`}>
-        <Icon className="h-3 w-3 mr-1" />
-        {status.charAt(0).toUpperCase() + status.slice(1)}
-      </Badge>
-    )
-  }
-
-  return (
-    <div className="p-6 space-y-6">
-      {/* Project Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white rounded-lg border p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-medium text-gray-600">Total Projects</h3>
-            <FolderOpen className="h-4 w-4 text-blue-500" />
-          </div>
-          <div className="text-3xl font-bold text-gray-900">{projects.length}</div>
-        </div>
-
-        <div className="bg-white rounded-lg border p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-medium text-gray-600">Active Projects</h3>
-            <Activity className="h-4 w-4 text-green-500" />
-          </div>
-          <div className="text-3xl font-bold text-green-600">
-            {projects.filter(p => p.status === 'active').length}
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg border p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-medium text-gray-600">Total Budget</h3>
-            <DollarSign className="h-4 w-4 text-purple-500" />
-          </div>
-          <div className="text-3xl font-bold text-gray-900">
-            ${projects.reduce((sum, p) => sum + p.budget, 0).toLocaleString()}
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg border p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-medium text-gray-600">Avg Analyses/Project</h3>
-            <BarChart3 className="h-4 w-4 text-orange-500" />
-          </div>
-          <div className="text-3xl font-bold text-gray-900">
-            {Math.round(projects.reduce((sum, p) => sum + p.analyses, 0) / projects.length)}
-          </div>
-        </div>
-      </div>
-
-      {/* Projects Table */}
-      <div className="bg-white rounded-xl border p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900">Project Overview</h3>
-            <p className="text-sm text-gray-500">Manage and track your cabinet analysis projects</p>
-          </div>
-          <div className="flex items-center space-x-3">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Search projects..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 w-64"
-              />
-            </div>
-            <Button className="bg-blue-600 hover:bg-blue-700">
-              <Plus className="h-4 w-4 mr-2" />
-              New Project
-            </Button>
-          </div>
-        </div>
-
-        <div className="rounded-lg border overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="text-left py-3 px-4 font-medium text-gray-700">Project Details</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-700">Client</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-700">Status</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-700">Analyses</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-700">Budget</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-700">Last Update</th>
-                <th className="text-right py-3 px-4 font-medium text-gray-700">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {projects.map((project) => (
-                <tr key={project.id} className="border-b hover:bg-gray-50">
-                  <td className="py-4 px-4">
-                    <div className="font-medium text-gray-900">{project.name}</div>
-                    <div className="text-sm text-gray-500">{project.id}</div>
-                  </td>
-                  <td className="py-4 px-4 text-gray-900">{project.client}</td>
-                  <td className="py-4 px-4">{getStatusBadge(project.status)}</td>
-                  <td className="py-4 px-4">
-                    <div className="flex items-center space-x-2">
-                      <BarChart3 className="h-4 w-4 text-gray-400" />
-                      <span className="font-medium">{project.analyses}</span>
-                    </div>
-                  </td>
-                  <td className="py-4 px-4 font-medium text-gray-900">
-                    ${project.budget.toLocaleString()}
-                  </td>
-                  <td className="py-4 px-4 text-sm text-gray-600">
-                    {new Date(project.lastUpdate).toLocaleDateString()}
-                  </td>
-                  <td className="py-4 px-4">
-                    <div className="flex items-center justify-end space-x-2">
-                      <Button variant="ghost" size="sm"><Eye className="h-4 w-4" /></Button>
-                      <Button variant="ghost" size="sm"><Edit className="h-4 w-4" /></Button>
-                      <Button variant="ghost" size="sm"><Trash2 className="h-4 w-4" /></Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // Settings Page
 function SettingsContent() {
   const [notifications, setNotifications] = useState(true)
@@ -1953,17 +1680,22 @@ function SettingsContent() {
 }
 
 // Main Dashboard Component
-export default function ProfessionalDashboard({ onNewAnalysis }) {
+export default function ProfessionalDashboard({ onNewAnalysis, user, onLogout = () => {} }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [activeMenuItem, setActiveMenuItem] = useState('dashboard')
+
+  const userRole = user?.role || 'staff'
+  const userId = user?.id || '1'
 
   const getPageTitle = () => {
     const titles = {
       dashboard: 'Dashboard Overview',
+      customers: 'Customers',
+      salesPipeline: 'Sales Pipeline',
+      jobs: 'Jobs',
+      jobScheduling: 'Job Scheduling',
       upload: 'New Analysis',
       history: 'Analysis History',
-      analytics: 'Analytics & Performance',
-      projects: 'Project Management',
       settings: 'Settings & Configuration'
     }
     return titles[activeMenuItem] || 'Dashboard'
@@ -1972,31 +1704,27 @@ export default function ProfessionalDashboard({ onNewAnalysis }) {
   const renderContent = () => {
     switch (activeMenuItem) {
       case 'dashboard':
-        return <DashboardContent />
+        return <DashboardContent userRole={userRole} />
+      case 'customers':
+        return userRole === 'admin' ? <CustomersPage /> : <DashboardContent userRole={userRole} />
+      case 'salesPipeline':
+        return <SalesPipeline userRole={userRole} />
+      case 'jobs':
+        return userRole === 'admin' ? <Jobs /> : <DashboardContent userRole={userRole} />
+      case 'schedule':
+        return <JobScheduling userRole={userRole} user={user} />
+      case 'priceGenerator':
+        return userRole === 'admin' ? <PriceGenerator /> : <DashboardContent userRole={userRole} />
       case 'upload':
         return <UploadContent />
       case 'history':
-        return <AnalysisHistoryContent />
-      case 'analytics':
-        return <AnalyticsContent />
-      case 'projects':
-        return <ProjectsContent />
+        return <AnalysisHistoryContent userRole={userRole} />
       case 'settings':
-        return <SettingsContent />
+        return userRole === 'admin' ? <SettingsContent /> : <DashboardContent userRole={userRole} />
       default:
-        return <DashboardContent />
+        return <DashboardContent userRole={userRole} />
     }
   }
-
-  // // Handle the "New Analysis" button click from header
-  // const handleNewAnalysis = () => {
-  //   if (onNewAnalysis && typeof onNewAnalysis === 'function') {
-  //     onNewAnalysis()
-  //   } else {
-  //     // Fallback: switch to upload page
-  //     setActiveMenuItem('upload')
-  //   }
-  // }
 
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -2005,6 +1733,9 @@ export default function ProfessionalDashboard({ onNewAnalysis }) {
         setActiveMenuItem={setActiveMenuItem}
         sidebarCollapsed={sidebarCollapsed}
         setSidebarCollapsed={setSidebarCollapsed}
+        userRole={userRole}
+        user={user}
+        onLogout={onLogout}
       />
 
       {/* Main Content */}
@@ -2017,10 +1748,13 @@ export default function ProfessionalDashboard({ onNewAnalysis }) {
                 <h1 className="text-2xl font-bold text-gray-900">{getPageTitle()}</h1>
                 <p className="text-sm text-gray-500">
                   {activeMenuItem === 'dashboard' && 'Monitor your cabinet analysis operations'}
+                  {activeMenuItem === 'customers' && 'View and Manage all your customers'}
+                  {activeMenuItem === 'salesPipeline' && 'View your sales pipeline'}
+                  {activeMenuItem === 'jobs' && 'View and manage all your jobs'}
+                  {activeMenuItem === 'priceGenerator' && 'generate prices'}
+                  {activeMenuItem === 'schedule' && 'Schedule jobs'}
                   {activeMenuItem === 'upload' && 'Upload and analyze your kitchen cabinet drawings'}
                   {activeMenuItem === 'history' && 'View and manage all your analysis records'}
-                  {activeMenuItem === 'analytics' && 'Comprehensive performance insights and metrics'}
-                  {activeMenuItem === 'projects' && 'Organize and track your cabinet projects'}
                   {activeMenuItem === 'settings' && 'Configure your account and system preferences'}
                 </p>
               </div>
